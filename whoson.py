@@ -8,7 +8,7 @@
 
 import requests
 import subprocess
-import creds // Your info in a separate file
+import creds # Your info in a separate file
 
 headers = {'Client-ID': '{}'.format(creds.clientid)}
 
