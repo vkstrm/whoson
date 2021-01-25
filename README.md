@@ -1,5 +1,8 @@
 # whoson
-See who is live on Twitch, but in the terminal
+See who is live on Twitch, but in the terminal!
 
-Simple lil python script. 
-Need a twitch api id, streamlink installed (unless you just want to watch in browser) and your Twitch user id.
+Configure with Twitch Client ID and secret using `--client-id` and `--client-secret` commands. Also your username using `--username`
+
+As an argument use whatever you want to watch in, like `firefox`, `chrome` or `streamlink`
+
+Stores a configuration file in the home catalogue.

@@ -1,53 +1,58 @@
-#!/usr/bin/env python3
-
-#
-#   See who is live on twitch and watch stream in VLC.
-#   Assumes you have a twitch api client id, and streamlink installed.
-#   Doesn't work well if you follow more than 100 people
-#
-
-import requests
 import subprocess
-import creds # Your info in a separate file
+import argparse
+import sys
+import time
+import configparser
+from client import Client
+from configuration import Configuration
 
-headers = {'Client-ID': '{}'.format(creds.clientid)}
 
-# Get id of your follows
-def get_follows():
-    followerQuery = "https://api.twitch.tv/helix/users/follows?from_id={}&first=100".format(creds.user_id)
+def handle_args(args):
+    configuration = Configuration()
 
-    response = requests.get(followerQuery, headers=headers)
-    users = response.json()
+    if args.username:
+        configuration.username(args.username)
+        print(f"Username set as {args.username}")
+    if args.client_id:
+        configuration.client_id(args.client_id)
+        print("Client ID set")
+    if args.client_secret:
+        configuration.client_secret(args.client_secret)
+        print("Client secret set")
+    
+    if args.program:
+        run(args, configuration)
 
-    following_ids = []
-    for user in users["data"]:
-        following_ids.append(user["to_id"])
+def run(args, configuration):
+    client_info = configuration.client_info()
+    client = Client(client_info["client_id"], client_info["client_secret"])
 
-    payload = {'user_id': following_ids}
+    access_token = ""
+    try:
+        access_token = configuration.access_token()
+    except (configparser.NoOptionError, ValueError):
+        access_token, exp = client.get_access_token()
+        exp = int(time.time()) + exp
+        configuration.access_token(access_token, exp)
+        
+    client.set_access_token(access_token)
+    
+    user_id = client.get_user_id(configuration.username())
+    follows = client.get_follows(user_id)
+    onlines = client.get_onlines(follows)
 
-    return payload
+    name = ""
+    if len(onlines) != 0:
+        name = print_onlines(onlines)
+    else:
+        print("No one is online!")
+        return
 
-# Get which follows are online
-def get_onlines(payload):
-    streamsQuery = "https://api.twitch.tv/helix/streams?first=100"
-
-    response = requests.get(streamsQuery, headers=headers, params=payload)
-    streams = response.json()
-
-    online = []
-    for stream in streams["data"]:
-        online.append({
-            'name': stream["user_name"],
-            'gameid': stream["game_id"],
-            'title': stream["title"],
-            'viewers': stream["viewer_count"],
-        })
-
-    return online
+    subprocess.run([args.program, f"https://twitch.tv/{name}"])
 
 
 # Print whos online, and select one to watch
-def print_onlines(online):
+def print_onlines(online: list):
     count = 1
 
     for on in online:
@@ -62,21 +67,16 @@ def print_onlines(online):
         return 0
 
 
-# Start selected stream
-def start_stream(name):
-        subprocess.run(["streamlink", "twitch.tv/{}".format(name), "best"])
-
-
 def main():
-    follows = get_follows()
-    onlines = get_onlines(follows)
-    if len(onlines) != 0:
-        name = print_onlines(onlines)
-        if name:
-            start_stream(name)
-    else:
-        print("No one is online!")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("program", help="open stream in program of choice", type=str)
+    parser.add_argument("--client-id", type=str)
+    parser.add_argument("--client-secret", type=str)
+    parser.add_argument("--username", type=str)
+
+    args = parser.parse_args()
+    handle_args(args)
+
 
 if __name__ == "__main__":
     main()
-    
